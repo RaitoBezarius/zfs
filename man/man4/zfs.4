@@ -732,7 +732,7 @@ ZFS uses the number of threads depending on the number of CPU cores.
 The minimum number of threads is 1 and applies to systems from 1 to 5 CPU cores.
 Systems with 6 CPU cores get 2 eviction threads.
 ZFS on systems larger than that uses log2 of the CPU count
-plus the CPU count shifted 6 bits.
+plus one for each 64 CPUs.
 This way the number of eviction threads scales up more on high CPU counts.
 Currently, ZFS will not scale automatically beyond 16 threads.
 .Pp
