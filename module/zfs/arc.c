@@ -11029,5 +11029,5 @@ ZFS_MODULE_PARAM(zfs_arc, zfs_arc_, evict_batch_limit, UINT, ZMOD_RW,
 ZFS_MODULE_PARAM(zfs_arc, zfs_arc_, prune_task_threads, INT, ZMOD_RW,
 	"Number of arc_prune threads");
 
-ZFS_MODULE_PARAM(zfs_arc, zfs_arc_, evict_threads, UINT, ZMOD_RW,
+ZFS_MODULE_PARAM(zfs_arc, zfs_arc_, evict_threads, UINT, ZMOD_RD,
 	"Maximum number of arc_evict threads");
