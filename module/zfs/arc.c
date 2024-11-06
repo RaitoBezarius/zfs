@@ -4199,7 +4199,7 @@ arc_evict_state(arc_state_t *state, arc_buf_contents_t type, uint64_t spa,
 				uint64_t evict = i < k ? bytes_pertask :
 				    bytes_pertask_low;
 
-				memset(&evarg[i].tqe, 0, sizeof (evarg[i].tqe));
+				taskq_init_ent(&evarg[i].tqe);
 				evarg[i].ml = ml;
 				evarg[i].marker = markers[sublist_idx];
 				evarg[i].spa = spa;
