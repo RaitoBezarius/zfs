@@ -7808,12 +7808,6 @@ arc_set_limits(uint64_t allmem)
 	arc_c_max = arc_default_max(arc_c_min, allmem);
 }
 
-static inline size_t
-arc_ilog2(int a)
-{
-	return (a > 1 ? 1 + arc_ilog2(a >> 1) : 0);
-}
-
 void
 arc_init(void)
 {
@@ -7886,7 +7880,7 @@ arc_init(void)
 
 	if (zfs_arc_evict_threads == 0)
 		zfs_arc_evict_threads_live = MIN(MAX(max_ncpus > 6 ? 2 : 1,
-		    arc_ilog2(max_ncpus) + (max_ncpus >> 6)), 16);
+		    (highbit64(max_ncpus) - 1) + (max_ncpus >> 6)), 16);
 	else
 		zfs_arc_evict_threads_live = zfs_arc_evict_threads;
 
