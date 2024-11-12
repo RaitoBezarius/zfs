@@ -7877,8 +7877,8 @@ arc_init(void)
 	buf_init();
 
 	if (zfs_arc_evict_threads == 0)
-		zfs_arc_evict_threads_live = MIN(MAX(max_ncpus > 6 ? 2 : 1,
-		    (highbit64(max_ncpus) - 1) + (max_ncpus >> 6)), 16);
+		zfs_arc_evict_threads_live = max_ncpus < 6 ? 1 :
+		    MIN((highbit64(max_ncpus) - 1) + max_ncpus / 64, 16);
 	else
 		zfs_arc_evict_threads_live = zfs_arc_evict_threads;
 
