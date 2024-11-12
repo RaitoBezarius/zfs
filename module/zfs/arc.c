@@ -7888,10 +7888,8 @@ arc_init(void)
 
 	arc_prune_taskq = taskq_create("arc_prune", zfs_arc_prune_task_threads,
 	    defclsyspri, 100, INT_MAX, TASKQ_PREPOPULATE | TASKQ_DYNAMIC);
-	arc_evict_taskq = taskq_create("arc_evict",
-	    MIN(zfs_arc_evict_threads_live, max_ncpus), defclsyspri,
-	    MIN(zfs_arc_evict_threads_live, max_ncpus), max_ncpus,
-	    TASKQ_PREPOPULATE);
+	arc_evict_taskq = taskq_create("arc_evict", zfs_arc_evict_threads_live,
+	    defclsyspri, 0, INT_MAX, TASKQ_PREPOPULATE);
 
 	arc_ksp = kstat_create("zfs", 0, "arcstats", "misc", KSTAT_TYPE_NAMED,
 	    sizeof (arc_stats) / sizeof (kstat_named_t), KSTAT_FLAG_VIRTUAL);
