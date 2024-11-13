@@ -4089,7 +4089,7 @@ arc_evict_state(arc_state_t *state, arc_buf_contents_t type, uint64_t spa,
 	arc_buf_hdr_t **markers;
 	unsigned num_sublists = multilist_get_num_sublists(ml);
 	evict_arg_t *evarg;
-	boolean_t usetskq = zfs_arc_evict_threads_live > 1;
+	boolean_t useevicttaskq = zfs_arc_evict_threads_live > 1;
 
 	if (bytes == 0)
 		return (total_evicted);
@@ -4115,14 +4115,14 @@ arc_evict_state(arc_state_t *state, arc_buf_contents_t type, uint64_t spa,
 		multilist_sublist_unlock(mls);
 	}
 
-	if (usetskq) {
+	if (useevicttaskq) {
 		evarg = kmem_alloc(sizeof (*evarg) * num_sublists, KM_NOSLEEP);
 		/*
 		 * Fall back to the regular single evict if it is not possible
 		 * to allocate memory for the task queue entries.
 		 */
 		if (evarg == NULL)
-			usetskq = B_FALSE;
+			useevicttaskq = B_FALSE;
 	}
 
 	/*
@@ -4204,7 +4204,7 @@ arc_evict_state(arc_state_t *state, arc_buf_contents_t type, uint64_t spa,
 			if (sublist_idx >= num_sublists)
 				sublist_idx = 0;
 
-			if (usetskq) {
+			if (useevicttaskq) {
 				uint64_t evict = i < k ? bytes_pertask :
 				    bytes_pertask_low;
 
@@ -4234,7 +4234,7 @@ arc_evict_state(arc_state_t *state, arc_buf_contents_t type, uint64_t spa,
 			total_evicted += bytes_evicted;
 		}
 
-		if (usetskq) {
+		if (useevicttaskq) {
 			taskq_wait(arc_evict_taskq);
 			total_evicted += scan_evicted;
 		}
@@ -4263,7 +4263,7 @@ arc_evict_state(arc_state_t *state, arc_buf_contents_t type, uint64_t spa,
 		}
 	}
 
-	if (usetskq)
+	if (useevicttaskq)
 		kmem_free(evarg, sizeof (*evarg) * num_sublists);
 
 	for (int i = 0; i < num_sublists; i++) {
@@ -7819,6 +7819,7 @@ arc_set_limits(uint64_t allmem)
 void
 arc_init(void)
 {
+	boolean_t useevicttaskq;
 	uint64_t percent, allmem = arc_all_memory();
 	mutex_init(&arc_evict_lock, NULL, MUTEX_DEFAULT, NULL);
 	list_create(&arc_evict_waiters, sizeof (arc_evict_waiter_t),
@@ -7891,6 +7892,7 @@ arc_init(void)
 		    MIN((highbit64(max_ncpus) - 1) + max_ncpus / 64, 16);
 	else
 		zfs_arc_evict_threads_live = zfs_arc_evict_threads;
+	useevicttaskq = zfs_arc_evict_threads_live > 1;
 
 	list_create(&arc_prune_list, sizeof (arc_prune_t),
 	    offsetof(arc_prune_t, p_node));
@@ -7898,8 +7900,10 @@ arc_init(void)
 
 	arc_prune_taskq = taskq_create("arc_prune", zfs_arc_prune_task_threads,
 	    defclsyspri, 100, INT_MAX, TASKQ_PREPOPULATE | TASKQ_DYNAMIC);
-	arc_evict_taskq = taskq_create("arc_evict", zfs_arc_evict_threads_live,
-	    defclsyspri, 0, INT_MAX, TASKQ_PREPOPULATE);
+	if (useevicttaskq)
+		arc_evict_taskq = taskq_create("arc_evict",
+		    zfs_arc_evict_threads_live, defclsyspri, 0, INT_MAX,
+		    TASKQ_PREPOPULATE);
 
 	arc_ksp = kstat_create("zfs", 0, "arcstats", "misc", KSTAT_TYPE_NAMED,
 	    sizeof (arc_stats) / sizeof (kstat_named_t), KSTAT_FLAG_VIRTUAL);
@@ -7960,6 +7964,8 @@ arc_init(void)
 void
 arc_fini(void)
 {
+	boolean_t useevicttaskq = zfs_arc_evict_threads_live > 1;
+
 	arc_prune_t *p;
 
 #ifdef _KERNEL
@@ -7974,8 +7980,10 @@ arc_fini(void)
 		arc_ksp = NULL;
 	}
 
-	taskq_wait(arc_evict_taskq);
-	taskq_destroy(arc_evict_taskq);
+	if (useevicttaskq) {
+		taskq_wait(arc_evict_taskq);
+		taskq_destroy(arc_evict_taskq);
+	}
 
 	taskq_wait(arc_prune_taskq);
 	taskq_destroy(arc_prune_taskq);
