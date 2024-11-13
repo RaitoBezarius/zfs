@@ -4088,6 +4088,8 @@ arc_evict_state(arc_state_t *state, arc_buf_contents_t type, uint64_t spa,
 	multilist_t *ml = &state->arcs_list[type];
 	arc_buf_hdr_t **markers;
 	unsigned num_sublists = multilist_get_num_sublists(ml);
+	evict_arg_t *evarg;
+	boolean_t usetskq = zfs_arc_evict_threads_live > 1;
 
 	if (bytes == 0)
 		return (total_evicted);
@@ -4113,15 +4115,22 @@ arc_evict_state(arc_state_t *state, arc_buf_contents_t type, uint64_t spa,
 		multilist_sublist_unlock(mls);
 	}
 
-	evict_arg_t *evarg = kmem_alloc(sizeof (*evarg) * num_sublists,
-	    KM_SLEEP);
+	if (usetskq) {
+		evarg = kmem_alloc(sizeof (*evarg) * num_sublists, KM_NOSLEEP);
+		/*
+		 * Fall back to the regular single evict if it is not possible
+		 * to allocate memory for the task queue entries.
+		 */
+		if (evarg == NULL)
+			usetskq = B_FALSE;
+	}
+
 	/*
 	 * While we haven't hit our target number of bytes to evict, or
 	 * we're evicting all available buffers.
 	 */
 	while (total_evicted < bytes) {
 		int sublist_idx = multilist_get_random_index(ml);
-		boolean_t usetskq = zfs_arc_evict_threads_live > 1;
 		uint64_t scan_evicted = 0;
 
 		uint64_t left = (bytes == ARC_EVICT_ALL ? bytes :
@@ -4254,7 +4263,8 @@ arc_evict_state(arc_state_t *state, arc_buf_contents_t type, uint64_t spa,
 		}
 	}
 
-	kmem_free(evarg, sizeof (*evarg) * num_sublists);
+	if (usetskq)
+		kmem_free(evarg, sizeof (*evarg) * num_sublists);
 
 	for (int i = 0; i < num_sublists; i++) {
 		multilist_sublist_t *mls = multilist_sublist_lock_idx(ml, i);
