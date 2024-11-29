@@ -726,7 +726,7 @@ but comes at a cost of additional unlocking and locking.
 Controls the number of ARC eviction threads to be used.
 .Pp
 When set to 0, the parallel arc eviction is disabled.
-Only one thread will be used to evict from ARC. 
+Only one thread will be used to evict from ARC.
 .Pp
 When set to 1, ZFS will compute the number of required eviction threads
 depending on the number of CPU cores (ncpu_max).
@@ -738,7 +738,7 @@ This way the number of eviction threads scales up more on high CPU counts.
 Currently, ZFS will not scale automatically beyond 16 threads.
 .Pp
 When set to a value greater then 1, the value will be used as an exact number
-of eviction threads, but no more than the number of CPU cores. 
+of eviction threads, but no more than the number of CPU cores.
 .Pp
 When set to a negative value, the number of threads will be set excactly to the
 number of CPU cores.
