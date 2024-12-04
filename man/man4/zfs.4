@@ -687,230 +687,255 @@ When the number of bytes consumed by dnodes in the ARC exceeds this number of
 bytes, try to unpin some of it in response to demand for non-metadata.
 This value acts as a ceiling to the amount of dnode metadata, and defaults to
 .Sy 0 ,
-    which indicates that a percent which is based on
-    .Sy zfs_arc_dnode_limit_percent
-    of the ARC meta buffers that may be used for dnodes.
-    .It Sy zfs_arc_dnode_limit_percent Ns = Ns Sy 10 Ns % Pq u64
-    Percentage that can be consumed by dnodes of ARC meta buffers.
-    .Pp
-    See also
-    .Sy zfs_arc_dnode_limit ,
-    which serves a similar purpose but has a higher priority if nonzero.
-    .
-    .It Sy zfs_arc_dnode_reduce_percent Ns = Ns Sy 10 Ns % Pq u64
-    Percentage of ARC dnodes to try to scan in response to demand for non-metadata
-    when the number of bytes consumed by dnodes exceeds
-    .Sy zfs_arc_dnode_limit .
-    .
-    .It Sy zfs_arc_average_blocksize Ns = Ns Sy 8192 Ns B Po 8 KiB Pc Pq uint
-    The ARC's buffer hash table is sized based on the assumption of an average
-    block size of this value.
-    This works out to roughly 1 MiB of hash table per 1 GiB of physical memory
-    with 8-byte pointers.
-    For configurations with a known larger average block size,
-    this value can be increased to reduce the memory footprint.
-    .
-    .It Sy zfs_arc_eviction_pct Ns = Ns Sy 200 Ns % Pq uint
-    When
-    .Fn arc_is_overflowing ,
-    .Fn arc_get_data_impl
-    waits for this percent of the requested amount of data to be evicted.
-    For example, by default, for every
-    .Em 2 KiB
-    that's evicted,
-    .Em 1 KiB
-    of it may be "reused" by a new allocation.
-    Since this is above
-    .Sy 100 Ns % ,
-    it ensures that progress is made towards getting
-    .Sy arc_size No under Sy arc_c .
-    Since this is finite, it ensures that allocations can still happen,
-    even during the potentially long time that
-    .Sy arc_size No is more than Sy arc_c .
-    .
-    .It Sy zfs_arc_evict_batch_limit Ns = Ns Sy 10 Pq uint
-    Number ARC headers to evict per sub-list before proceeding to another sub-list.
-    This batch-style operation prevents entire sub-lists from being evicted at once
-    but comes at a cost of additional unlocking and locking.
-    .
-    .It Sy zfs_arc_grow_retry Ns = Ns Sy 0 Ns s Pq uint
-    If set to a non zero value, it will replace the
-    .Sy arc_grow_retry
-    value with this value.
-    The
-    .Sy arc_grow_retry
-    .No value Pq default Sy 5 Ns s
-    is the number of seconds the ARC will wait before
-    trying to resume growth after a memory pressure event.
-    .
-    .It Sy zfs_arc_lotsfree_percent Ns = Ns Sy 10 Ns % Pq int
-    Throttle I/O when free system memory drops below this percentage of total
-    system memory.
-    Setting this value to
-    .Sy 0
-    will disable the throttle.
-    .
-    .It Sy zfs_arc_max Ns = Ns Sy 0 Ns B Pq u64
-    Max size of ARC in bytes.
-    If
-    .Sy 0 ,
-    then the max size of ARC is determined by the amount of system memory installed.
-    The larger of
-    .Sy all_system_memory No \- Sy 1 GiB
-    and
-    .Sy 5/8 No \(mu Sy all_system_memory
-    will be used as the limit.
-    This value must be at least
-    .Sy 67108864 Ns B Pq 64 MiB .
-    .Pp
-    This value can be changed dynamically, with some caveats.
-    It cannot be set back to
-    .Sy 0
-    while running, and reducing it below the current ARC size will not cause
-    the ARC to shrink without memory pressure to induce shrinking.
-    .
-    .It Sy zfs_arc_meta_balance Ns = Ns Sy 500 Pq uint
-    Balance between metadata and data on ghost hits.
-    Values above 100 increase metadata caching by proportionally reducing effect
-    of ghost data hits on target data/metadata rate.
-    .
-    .It Sy zfs_arc_min Ns = Ns Sy 0 Ns B Pq u64
-    Min size of ARC in bytes.
-    .No If set to Sy 0 , arc_c_min
-    will default to consuming the larger of
-    .Sy 32 MiB
-    and
-    .Sy all_system_memory No / Sy 32 .
-    .
-    .It Sy zfs_arc_min_prefetch_ms Ns = Ns Sy 0 Ns ms Ns Po Ns ≡ Ns 1s Pc Pq uint
-    Minimum time prefetched blocks are locked in the ARC.
-    .
-    .It Sy zfs_arc_min_prescient_prefetch_ms Ns = Ns Sy 0 Ns ms Ns Po Ns ≡ Ns 6s Pc Pq uint
-    Minimum time "prescient prefetched" blocks are locked in the ARC.
-    These blocks are meant to be prefetched fairly aggressively ahead of
-    the code that may use them.
-    .
-    .It Sy zfs_arc_prune_task_threads Ns = Ns Sy 1 Pq int
-    Number of arc_prune threads.
-    .Fx
-    does not need more than one.
-    Linux may theoretically use one per mount point up to number of CPUs,
-    but that was not proven to be useful.
-    .
-    .It Sy zfs_max_missing_tvds Ns = Ns Sy 0 Pq int
-    Number of missing top-level vdevs which will be allowed during
-    pool import (only in read-only mode).
-    .
-    .It Sy zfs_max_nvlist_src_size Ns = Sy 0 Pq u64
-    Maximum size in bytes allowed to be passed as
-    .Sy zc_nvlist_src_size
-    for ioctls on
-    .Pa /dev/zfs .
-    This prevents a user from causing the kernel to allocate
-    an excessive amount of memory.
-    When the limit is exceeded, the ioctl fails with
-    .Sy EINVAL
-    and a description of the error is sent to the
-    .Pa zfs-dbgmsg
-    log.
-    This parameter should not need to be touched under normal circumstances.
-    If
-    .Sy 0 ,
-    equivalent to a quarter of the user-wired memory limit under
-    .Fx
-    and to
-    .Sy 134217728 Ns B Pq 128 MiB
-    under Linux.
-    .
-    .It Sy zfs_multilist_num_sublists Ns = Ns Sy 0 Pq uint
-    To allow more fine-grained locking, each ARC state contains a series
-    of lists for both data and metadata objects.
-    Locking is performed at the level of these "sub-lists".
-    This parameters controls the number of sub-lists per ARC state,
-    and also applies to other uses of the multilist data structure.
-    .Pp
-    If
-    .Sy 0 ,
-    equivalent to the greater of the number of online CPUs and
-    .Sy 4 .
-    .
-    .It Sy zfs_arc_overflow_shift Ns = Ns Sy 8 Pq int
-    The ARC size is considered to be overflowing if it exceeds the current
-    ARC target size
-    .Pq Sy arc_c
-    by thresholds determined by this parameter.
-    Exceeding by
-    .Sy ( arc_c No >> Sy zfs_arc_overflow_shift ) No / Sy 2
-    starts ARC reclamation process.
-    If that appears insufficient, exceeding by
-    .Sy ( arc_c No >> Sy zfs_arc_overflow_shift ) No \(mu Sy 1.5
-    blocks new buffer allocation until the reclaim thread catches up.
-    Started reclamation process continues till ARC size returns below the
-    target size.
-    .Pp
-    The default value of
-    .Sy 8
-    causes the ARC to start reclamation if it exceeds the target size by
-    .Em 0.2%
-    of the target size, and block allocations by
-    .Em 0.6% .
-    .
-    .It Sy zfs_arc_shrink_shift Ns = Ns Sy 0 Pq uint
-    If nonzero, this will update
-    .Sy arc_shrink_shift Pq default Sy 7
-    with the new value.
-    .
-    .It Sy zfs_arc_pc_percent Ns = Ns Sy 0 Ns % Po off Pc Pq uint
-    Percent of pagecache to reclaim ARC to.
-    .Pp
-    This tunable allows the ZFS ARC to play more nicely
-    with the kernel's LRU pagecache.
-    It can guarantee that the ARC size won't collapse under scanning
-    pressure on the pagecache, yet still allows the ARC to be reclaimed down to
-    .Sy zfs_arc_min
-    if necessary.
-    This value is specified as percent of pagecache size (as measured by
-            .Sy NR_FILE_PAGES ) ,
-    where that percent may exceed
-    .Sy 100 .
-    This
-    only operates during memory pressure/reclaim.
-    .
-    .It Sy zfs_arc_shrinker_limit Ns = Ns Sy 10000 Pq int
-    This is a limit on how many pages the ARC shrinker makes available for
-    eviction in response to one page allocation attempt.
-    Note that in practice, the kernel's shrinker can ask us to evict
-    up to about four times this for one allocation attempt.
-    To reduce OOM risk, this limit is applied for kswapd reclaims only.
-    .Pp
-    The default limit of
-    .Sy 10000 Pq in practice, Em 160 MiB No per allocation attempt with 4 KiB pages
-    limits the amount of time spent attempting to reclaim ARC memory to
-    less than 100 ms per allocation attempt,
-    even with a small average compressed block size of ~8 KiB.
-    .Pp
-    The parameter can be set to 0 (zero) to disable the limit,
-    and only applies on Linux.
-    .
-    .It Sy zfs_arc_shrinker_seeks Ns = Ns Sy 2 Pq int
-    Relative cost of ARC eviction on Linux, AKA number of seeks needed to
-    restore evicted page.
-    Bigger values make ARC more precious and evictions smaller, comparing to
-    other kernel subsystems.
-    Value of 4 means parity with page cache.
-    .
-    .It Sy zfs_arc_sys_free Ns = Ns Sy 0 Ns B Pq u64
-    The target number of bytes the ARC should leave as free memory on the system.
-    If zero, equivalent to the bigger of
-    .Sy 512 KiB No and Sy all_system_memory/64 .
-    .
-    .It Sy zfs_autoimport_disable Ns = Ns Sy 1 Ns | Ns 0 Pq int
-    Disable pool import at module load by ignoring the cache file
-    .Pq Sy spa_config_path .
-    .
-    .It Sy zfs_checksum_events_per_second Ns = Ns Sy 20 Ns /s Pq uint
-    Rate limit checksum events to this many per second.
-    Note that this should not be set below the ZED thresholds
+which indicates that a percent which is based on
+.Sy zfs_arc_dnode_limit_percent
+of the ARC meta buffers that may be used for dnodes.
+.It Sy zfs_arc_dnode_limit_percent Ns = Ns Sy 10 Ns % Pq u64
+Percentage that can be consumed by dnodes of ARC meta buffers.
+.Pp
+See also
+.Sy zfs_arc_dnode_limit ,
+which serves a similar purpose but has a higher priority if nonzero.
+.
+.It Sy zfs_arc_dnode_reduce_percent Ns = Ns Sy 10 Ns % Pq u64
+Percentage of ARC dnodes to try to scan in response to demand for non-metadata
+when the number of bytes consumed by dnodes exceeds
+.Sy zfs_arc_dnode_limit .
+.
+.It Sy zfs_arc_average_blocksize Ns = Ns Sy 8192 Ns B Po 8 KiB Pc Pq uint
+The ARC's buffer hash table is sized based on the assumption of an average
+block size of this value.
+This works out to roughly 1 MiB of hash table per 1 GiB of physical memory
+with 8-byte pointers.
+For configurations with a known larger average block size,
+this value can be increased to reduce the memory footprint.
+.
+.It Sy zfs_arc_eviction_pct Ns = Ns Sy 200 Ns % Pq uint
+When
+.Fn arc_is_overflowing ,
+.Fn arc_get_data_impl
+waits for this percent of the requested amount of data to be evicted.
+For example, by default, for every
+.Em 2 KiB
+that's evicted,
+.Em 1 KiB
+of it may be "reused" by a new allocation.
+Since this is above
+.Sy 100 Ns % ,
+it ensures that progress is made towards getting
+.Sy arc_size No under Sy arc_c .
+Since this is finite, it ensures that allocations can still happen,
+even during the potentially long time that
+.Sy arc_size No is more than Sy arc_c .
+.
+.It Sy zfs_arc_evict_batch_limit Ns = Ns Sy 10 Pq uint
+Number ARC headers to evict per sub-list before proceeding to another sub-list.
+This batch-style operation prevents entire sub-lists from being evicted at once
+but comes at a cost of additional unlocking and locking.
+.
+.It Sy zfs_arc_evict_threads Ns = Ns Sy 1 Pq int
+Controls the number of ARC eviction threads to be used.
+.Pp
+When set to 0, the parallel arc eviction is disabled.
+Only one thread will be used to evict from ARC.
+.Pp
+When set to 1, ZFS will compute the number of required eviction threads
+depending on the number of CPU cores (ncpu_max).
+The minimum number of threads is 1 and applies to systems from 1 to 5 CPU cores.
+Systems with 6 CPU cores get 2 eviction threads.
+ZFS on systems larger than that uses log2 of the CPU count
+plus one for each 64 CPUs.
+This way the number of eviction threads scales up more on high CPU counts.
+Currently, ZFS will not scale automatically beyond 16 threads.
+.Pp
+When set to a value greater then 1, the value will be used as an exact number
+of eviction threads, but no more than the number of CPU cores.
+.Pp
+When set to a negative value, the number of threads will be set excactly to the
+number of CPU cores.
+.Pp
+More threads may improve the responsiveness of ZFS to memory pressure.
+This can be important for performance when eviction from the ARC becomes
+a bottleneck for reads and writes.
+.
+.It Sy zfs_arc_grow_retry Ns = Ns Sy 0 Ns s Pq uint
+If set to a non zero value, it will replace the
+.Sy arc_grow_retry
+value with this value.
+The
+.Sy arc_grow_retry
+.No value Pq default Sy 5 Ns s
+is the number of seconds the ARC will wait before
+trying to resume growth after a memory pressure event.
+.
+.It Sy zfs_arc_lotsfree_percent Ns = Ns Sy 10 Ns % Pq int
+Throttle I/O when free system memory drops below this percentage of total
+system memory.
+Setting this value to
+.Sy 0
+will disable the throttle.
+.
+.It Sy zfs_arc_max Ns = Ns Sy 0 Ns B Pq u64
+Max size of ARC in bytes.
+If
+.Sy 0 ,
+then the max size of ARC is determined by the amount of system memory installed.
+The larger of
+.Sy all_system_memory No \- Sy 1 GiB
+and
+.Sy 5/8 No \(mu Sy all_system_memory
+will be used as the limit.
+This value must be at least
+.Sy 67108864 Ns B Pq 64 MiB .
+.Pp
+This value can be changed dynamically, with some caveats.
+It cannot be set back to
+.Sy 0
+while running, and reducing it below the current ARC size will not cause
+the ARC to shrink without memory pressure to induce shrinking.
+.
+.It Sy zfs_arc_meta_balance Ns = Ns Sy 500 Pq uint
+Balance between metadata and data on ghost hits.
+Values above 100 increase metadata caching by proportionally reducing effect
+of ghost data hits on target data/metadata rate.
+.
+.It Sy zfs_arc_min Ns = Ns Sy 0 Ns B Pq u64
+Min size of ARC in bytes.
+.No If set to Sy 0 , arc_c_min
+will default to consuming the larger of
+.Sy 32 MiB
+and
+.Sy all_system_memory No / Sy 32 .
+.
+.It Sy zfs_arc_min_prefetch_ms Ns = Ns Sy 0 Ns ms Ns Po Ns ≡ Ns 1s Pc Pq uint
+Minimum time prefetched blocks are locked in the ARC.
+.
+.It Sy zfs_arc_min_prescient_prefetch_ms Ns = Ns Sy 0 Ns ms Ns Po Ns ≡ Ns 6s Pc Pq uint
+Minimum time "prescient prefetched" blocks are locked in the ARC.
+These blocks are meant to be prefetched fairly aggressively ahead of
+the code that may use them.
+.
+.It Sy zfs_arc_prune_task_threads Ns = Ns Sy 1 Pq int
+Number of arc_prune threads.
+.Fx
+does not need more than one.
+Linux may theoretically use one per mount point up to number of CPUs,
+but that was not proven to be useful.
+.
+.It Sy zfs_max_missing_tvds Ns = Ns Sy 0 Pq int
+Number of missing top-level vdevs which will be allowed during
+pool import (only in read-only mode).
+.
+.It Sy zfs_max_nvlist_src_size Ns = Sy 0 Pq u64
+Maximum size in bytes allowed to be passed as
+.Sy zc_nvlist_src_size
+for ioctls on
+.Pa /dev/zfs .
+This prevents a user from causing the kernel to allocate
+an excessive amount of memory.
+When the limit is exceeded, the ioctl fails with
+.Sy EINVAL
+and a description of the error is sent to the
+.Pa zfs-dbgmsg
+log.
+This parameter should not need to be touched under normal circumstances.
+If
+.Sy 0 ,
+equivalent to a quarter of the user-wired memory limit under
+.Fx
+and to
+.Sy 134217728 Ns B Pq 128 MiB
+under Linux.
+.
+.It Sy zfs_multilist_num_sublists Ns = Ns Sy 0 Pq uint
+To allow more fine-grained locking, each ARC state contains a series
+of lists for both data and metadata objects.
+Locking is performed at the level of these "sub-lists".
+This parameters controls the number of sub-lists per ARC state,
+and also applies to other uses of the multilist data structure.
+.Pp
+If
+.Sy 0 ,
+equivalent to the greater of the number of online CPUs and
+.Sy 4 .
+.
+.It Sy zfs_arc_overflow_shift Ns = Ns Sy 8 Pq int
+The ARC size is considered to be overflowing if it exceeds the current
+ARC target size
+.Pq Sy arc_c
+by thresholds determined by this parameter.
+Exceeding by
+.Sy ( arc_c No >> Sy zfs_arc_overflow_shift ) No / Sy 2
+starts ARC reclamation process.
+If that appears insufficient, exceeding by
+.Sy ( arc_c No >> Sy zfs_arc_overflow_shift ) No \(mu Sy 1.5
+blocks new buffer allocation until the reclaim thread catches up.
+Started reclamation process continues till ARC size returns below the
+target size.
+.Pp
+The default value of
+.Sy 8
+causes the ARC to start reclamation if it exceeds the target size by
+.Em 0.2%
+of the target size, and block allocations by
+.Em 0.6% .
+.
+.It Sy zfs_arc_shrink_shift Ns = Ns Sy 0 Pq uint
+If nonzero, this will update
+.Sy arc_shrink_shift Pq default Sy 7
+with the new value.
+.
+.It Sy zfs_arc_pc_percent Ns = Ns Sy 0 Ns % Po off Pc Pq uint
+Percent of pagecache to reclaim ARC to.
+.Pp
+This tunable allows the ZFS ARC to play more nicely
+with the kernel's LRU pagecache.
+It can guarantee that the ARC size won't collapse under scanning
+pressure on the pagecache, yet still allows the ARC to be reclaimed down to
+.Sy zfs_arc_min
+if necessary.
+This value is specified as percent of pagecache size (as measured by
+.Sy NR_FILE_PAGES ) ,
+where that percent may exceed
+.Sy 100 .
+This
+only operates during memory pressure/reclaim.
+.
+.It Sy zfs_arc_shrinker_limit Ns = Ns Sy 10000 Pq int
+This is a limit on how many pages the ARC shrinker makes available for
+eviction in response to one page allocation attempt.
+Note that in practice, the kernel's shrinker can ask us to evict
+up to about four times this for one allocation attempt.
+To reduce OOM risk, this limit is applied for kswapd reclaims only.
+.Pp
+The default limit of
+.Sy 10000 Pq in practice, Em 160 MiB No per allocation attempt with 4 KiB pages
+limits the amount of time spent attempting to reclaim ARC memory to
+less than 100 ms per allocation attempt,
+even with a small average compressed block size of ~8 KiB.
+.Pp
+The parameter can be set to 0 (zero) to disable the limit,
+and only applies on Linux.
+.
+.It Sy zfs_arc_shrinker_seeks Ns = Ns Sy 2 Pq int
+Relative cost of ARC eviction on Linux, AKA number of seeks needed to
+restore evicted page.
+Bigger values make ARC more precious and evictions smaller, comparing to
+other kernel subsystems.
+Value of 4 means parity with page cache.
+.
+.It Sy zfs_arc_sys_free Ns = Ns Sy 0 Ns B Pq u64
+The target number of bytes the ARC should leave as free memory on the system.
+If zero, equivalent to the bigger of
+.Sy 512 KiB No and Sy all_system_memory/64 .
+.
+.It Sy zfs_autoimport_disable Ns = Ns Sy 1 Ns | Ns 0 Pq int
+Disable pool import at module load by ignoring the cache file
+.Pq Sy spa_config_path .
+.
+.It Sy zfs_checksum_events_per_second Ns = Ns Sy 20 Ns /s Pq uint
+Rate limit checksum events to this many per second.
+Note that this should not be set below the ZED thresholds
 (currently 10 checksums over 10 seconds)
     or else the daemon may not trigger any action.
     .
